@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        canvas.emscripten {
+            width: 1024px;
+            height: 768px;
+            border: 0px none;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+
+        #loadingDiv {
+            text-align: center;
+        }
+        #output {
+            width: 100%;
+            height: 200px;
+            margin: 0 auto;
+            margin-top: 10px;
+            border-left: 0px;
+            border-right: 0px;
+            padding-left: 0px;
+            padding-right: 0px;
+            display: block;
+            background-color: black;
+            color: white;
+            font-family: 'Lucida Console', Monaco, monospace;
+            outline: none;
+        }
+    </style>
+    <meta charset="utf-8" />
+    <title>Viewer Harfang</title>
+</head>
+<body style="background-color:powderblue;">
+    <div id="loadingDiv">The Viewer Harfang is loading...</div>
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+    <textarea id="output" rows="8"></textarea>
+    <script type="text/javascript" src="harfang_c_binding_js_emscripten.js"></script>
+    <script type="text/javascript">
+
+        // instantiate harfang
+        Harfang({
+            canvas: (() => document.getElementById('canvas'))(),
+        }).then(function (hg) {            
+            hg.InputInit()
+            hg.WindowSystemInit()
+
+            hg.AddAssetsPackage("project_compiled.zip")      
+            function loopWaitAssetsLoaded() {
+                if (!hg.AssetsPackageIsAdded()){
+                    window.requestAnimationFrame(loopWaitAssetsLoaded)
+                }else{
+                    NexAfterDownloadPackage();
+                }                
+            }
+            window.requestAnimationFrame(loopWaitAssetsLoaded)
+
+            function NexAfterDownloadPackage() {
+                width = hg.canvas.getBoundingClientRect().width;
+                height = hg.canvas.getBoundingClientRect().height;
+
+                win = hg.NewWindow(width, height)
+
+                hg.RenderInit(win)
+
+                // rendering pipeline
+                pipeline = hg.CreateForwardPipeline(2048, false)
+                res = new hg.PipelineResources()
+
+                scene = new hg.Scene()
+                hg.LoadSceneFromAssets("DamagedHelmet/DamagedHelmet.scn", scene, res, hg.GetForwardPipelineInfo())
+
+                node = scene.GetNode("node_damagedHelmet_-6514")
+                camera = scene.GetNode("Camera")
+
+                mouse = new hg.Mouse()
+                keyboard = new hg.Keyboard()
+                    
+                function loop(timestamp) {                    
+                    mouse.Update()
+                    keyboard.Update()
+
+                    dt = hg.TickClock()
+                    
+                    cam_pos = camera.GetTransform().GetPos()
+                    cam_rot = camera.GetTransform().GetRot()
+                    cam_speed = 400.0
+                    hg.FpsController(keyboard, mouse, cam_pos, cam_rot, cam_speed, dt)
+                    camera.GetTransform().SetPos(cam_pos)
+                    camera.GetTransform().SetRot(cam_rot)
+
+                    scene.Update(dt)
+                    hg.SubmitSceneToPipeline(0, scene, new hg.IntRect(0, 0, width, height), true, pipeline, res)
+
+                    v = node.GetTransform().GetRot()
+                    v.y = v.y + 1 * hg.time_to_sec_f(dt)
+                    node.GetTransform().SetRot(v)
+                    
+                    
+                    hg.frame(false)
+
+                    hg.UpdateWindow(win)
+
+                    window.requestAnimationFrame(loop)
+                }
+                window.requestAnimationFrame(loop)
+            }
+        })
+
+
+    </script>
+</body>
+</html>
